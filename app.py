@@ -2,27 +2,24 @@ import cv2
 import torch
 from torchvision import models, transforms
 
+
 def load_model(device):
-    """ Carregar o modelo e movê-lo para o dispositivo (GPU, se disponível) """
     model = models.detection.keypointrcnn_resnet50_fpn(pretrained=True).to(device)
     model.eval()
     return model
 
 def process_image(image_path, device):
-    """ Função para processar a imagem """
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     transform = transforms.Compose([transforms.ToTensor()])
-    return transform(image).to(device), image  # Mover tensor para GPU
+    return transform(image).to(device), image
 
 def detect_poses(model, tensor_image):
-    """ Detectar poses na imagem """
     with torch.no_grad():
         prediction = model([tensor_image])
     return prediction
 
 def draw_keypoints(prediction, original_image, threshold=0.5):
-    """ Desenhar os keypoints na imagem """
     for person in prediction[0]['keypoints']:
         keypoints = person.detach().numpy()
         for point in keypoints:
@@ -31,13 +28,11 @@ def draw_keypoints(prediction, original_image, threshold=0.5):
                 cv2.circle(original_image, (int(x), int(y)), 5, (0, 255, 0), thickness=-1)
 
 def draw_skeleton(prediction, original_image, should_draw_skeleton, threshold=0.5):
-    """ Desenhar o esqueleto entre os pontos detectados """
     if not should_draw_skeleton:
         return
 
-    # Definir conexões para braços e pernas
-    arms = [(5, 7), (7, 9), (6, 8), (8, 10)]  # Conexões dos braços
-    body_legs = [(5, 6), (5, 11), (6, 12), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16)]  # Conexões do tronco até os pés
+    arms = [(5, 7), (7, 9), (6, 8), (8, 10)]
+    body_legs = [(5, 6), (5, 11), (6, 12), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16)]
 
     for person in prediction[0]['keypoints']:
         keypoints = person.detach().numpy()
@@ -48,7 +43,6 @@ def draw_skeleton(prediction, original_image, should_draw_skeleton, threshold=0.
                 cv2.line(original_image, start_pos, end_pos, (255, 0, 0), 3)
 
 def save_image(image, path):
-    """ Salvar a imagem processada """
     cv2.imwrite(path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
 def main(n_image, should_draw_skeleton=True):
@@ -59,17 +53,15 @@ def main(n_image, should_draw_skeleton=True):
     tensor_image, original_image = process_image(image_name, device)
     prediction = detect_poses(model, tensor_image)
 
-    # Mover os resultados da GPU para a CPU para processamento posterior
     prediction = [{k: v.to('cpu') for k, v in t.items()} for t in prediction]
 
     draw_keypoints(prediction, original_image)
     draw_skeleton(prediction, original_image, should_draw_skeleton)
 
-    # Salvar a imagem com as detecções
     detected_image = f'detected/pose_detected_{n_image}.jpg'
     save_image(original_image, detected_image)
 
 if __name__ == "__main__":
     for n_image in range(1, 6):
         print('Image:', n_image)
-        main(n_image, should_draw_skeleton=False)  # Altere para True para desenhar o esqueleto
+        main(n_image, should_draw_skeleton=False)
