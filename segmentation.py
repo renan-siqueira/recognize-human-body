@@ -1,6 +1,7 @@
 import cv2
 import torch
 from torchvision import models, transforms
+import os
 
 def load_segmentation_model():
     model = models.segmentation.deeplabv3_resnet101(pretrained=True)
@@ -41,10 +42,9 @@ def draw_segmentation_map(image, segmentation_map, remove_background):
 
     return segmented_image
 
-def main(n_image, remove_background=False):
+def main(image_path, remove_background=False):
     segmentation_model = load_segmentation_model()
 
-    image_path = f'image{n_image}.jpg'
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
@@ -52,9 +52,14 @@ def main(n_image, remove_background=False):
 
     segmented_image = draw_segmentation_map(image, segmentation_map, remove_background)
 
-    cv2.imwrite(f'segmented/segmented_image_{n_image}.jpg', cv2.cvtColor(segmented_image, cv2.COLOR_RGB2BGR))
+    output_file = os.path.join('segmented', 'segmented_' + os.path.basename(image_path))
+    cv2.imwrite(output_file, cv2.cvtColor(segmented_image, cv2.COLOR_RGB2BGR))
 
 if __name__ == "__main__":
-    for n_image in range(1, 6):
-        print('Image:', n_image)
-        main(n_image, remove_background=True)
+    images_directory = './'
+
+    for filename in os.listdir(images_directory):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_path = os.path.join(images_directory, filename)
+            print('Processing Image:', image_path)
+            main(image_path, remove_background=True)

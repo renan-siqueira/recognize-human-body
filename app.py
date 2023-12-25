@@ -1,7 +1,7 @@
 import cv2
 import torch
 from torchvision import models, transforms
-
+import os
 
 def load_model(device):
     model = models.detection.keypointrcnn_resnet50_fpn(pretrained=True).to(device)
@@ -45,12 +45,11 @@ def draw_skeleton(prediction, original_image, should_draw_skeleton, threshold=0.
 def save_image(image, path):
     cv2.imwrite(path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-def main(n_image, should_draw_skeleton=True):
+def main(image_path, should_draw_skeleton=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = load_model(device)
 
-    image_name = f'image{n_image}.jpg'
-    tensor_image, original_image = process_image(image_name, device)
+    tensor_image, original_image = process_image(image_path, device)
     prediction = detect_poses(model, tensor_image)
 
     prediction = [{k: v.to('cpu') for k, v in t.items()} for t in prediction]
@@ -58,10 +57,14 @@ def main(n_image, should_draw_skeleton=True):
     draw_keypoints(prediction, original_image)
     draw_skeleton(prediction, original_image, should_draw_skeleton)
 
-    detected_image = f'detected/pose_detected_{n_image}.jpg'
+    detected_image = os.path.join('detected', 'pose_detected_' + os.path.basename(image_path))
     save_image(original_image, detected_image)
 
 if __name__ == "__main__":
-    for n_image in range(1, 6):
-        print('Image:', n_image)
-        main(n_image, should_draw_skeleton=False)
+    images_directory = 'segmented'
+
+    for filename in os.listdir(images_directory):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_path = os.path.join(images_directory, filename)
+            print('Processing Image:', image_path)
+            main(image_path, should_draw_skeleton=False)
