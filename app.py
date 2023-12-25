@@ -30,11 +30,28 @@ def draw_keypoints(prediction, original_image, threshold=0.5):
             if conf > threshold:
                 cv2.circle(original_image, (int(x), int(y)), 5, (0, 255, 0), thickness=-1)
 
+def draw_skeleton(prediction, original_image, should_draw_skeleton, threshold=0.5):
+    """ Desenhar o esqueleto entre os pontos detectados """
+    if not should_draw_skeleton:
+        return
+
+    # Definir conexões para braços e pernas
+    arms = [(5, 7), (7, 9), (6, 8), (8, 10)]  # Conexões dos braços
+    body_legs = [(5, 6), (5, 11), (6, 12), (11, 12), (11, 13), (13, 15), (12, 14), (14, 16)]  # Conexões do tronco até os pés
+
+    for person in prediction[0]['keypoints']:
+        keypoints = person.detach().numpy()
+        for start_point, end_point in arms + body_legs:
+            if keypoints[start_point][2] > threshold and keypoints[end_point][2] > threshold:
+                start_pos = tuple(keypoints[start_point][:2].astype(int))
+                end_pos = tuple(keypoints[end_point][:2].astype(int))
+                cv2.line(original_image, start_pos, end_pos, (255, 0, 0), 3)
+
 def save_image(image, path):
     """ Salvar a imagem processada """
     cv2.imwrite(path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-def main(n_image):
+def main(n_image, should_draw_skeleton=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = load_model(device)
 
@@ -46,12 +63,13 @@ def main(n_image):
     prediction = [{k: v.to('cpu') for k, v in t.items()} for t in prediction]
 
     draw_keypoints(prediction, original_image)
+    draw_skeleton(prediction, original_image, should_draw_skeleton)
 
     # Salvar a imagem com as detecções
     detected_image = f'detected/pose_detected_{n_image}.jpg'
     save_image(original_image, detected_image)
 
-
 if __name__ == "__main__":
-    n_image = 5
-    main(n_image)
+    for n_image in range(1, 6):
+        print('Image:', n_image)
+        main(n_image, should_draw_skeleton=False)  # Altere para True para desenhar o esqueleto
