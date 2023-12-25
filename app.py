@@ -2,43 +2,56 @@ import cv2
 import torch
 from torchvision import models, transforms
 
-# Verificar se a GPU está disponível e configurar o dispositivo
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def load_model(device):
+    """ Carregar o modelo e movê-lo para o dispositivo (GPU, se disponível) """
+    model = models.detection.keypointrcnn_resnet50_fpn(pretrained=True).to(device)
+    model.eval()
+    return model
 
-# Carregar o modelo e movê-lo para o dispositivo (GPU, se disponível)
-model = models.detection.keypointrcnn_resnet50_fpn(pretrained=True).to(device)
-model.eval()
-
-# Função para processar a imagem
-def process_image(image_path):
+def process_image(image_path, device):
+    """ Função para processar a imagem """
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     transform = transforms.Compose([transforms.ToTensor()])
     return transform(image).to(device), image  # Mover tensor para GPU
 
-# Carregar e processar a imagem
-tensor_image, original_image = process_image('image.jpg')
+def detect_poses(model, tensor_image):
+    """ Detectar poses na imagem """
+    with torch.no_grad():
+        prediction = model([tensor_image])
+    return prediction
 
-# Detectar poses
-with torch.no_grad():
-    prediction = model([tensor_image])
+def draw_keypoints(prediction, original_image, threshold=0.5):
+    """ Desenhar os keypoints na imagem """
+    for person in prediction[0]['keypoints']:
+        keypoints = person.detach().numpy()
+        for point in keypoints:
+            x, y, conf = point
+            if conf > threshold:
+                cv2.circle(original_image, (int(x), int(y)), 5, (0, 255, 0), thickness=-1)
 
-# Mover os resultados da GPU para a CPU para processamento posterior
-prediction = [{k: v.to('cpu') for k, v in t.items()} for t in prediction]
+def save_image(image, path):
+    """ Salvar a imagem processada """
+    cv2.imwrite(path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-# Assumindo que 'prediction' é uma lista de dicionários com 'keypoints' e 'keypoints_scores'
-threshold = 0.5  # Defina um limiar de confiança
-for person in prediction[0]['keypoints']:
-    keypoints = person.detach().numpy()
-    for point in keypoints:
-        x, y, conf = point
-        if conf > threshold:
-            cv2.circle(original_image, (int(x), int(y)), 5, (0, 255, 0), thickness=-1)
+def main(n_image):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = load_model(device)
 
-# Conectar pontos-chave para formar o esqueleto (depende da ordem dos pontos no modelo)
-# ...
+    image_name = f'image{n_image}.jpg'
+    tensor_image, original_image = process_image(image_name, device)
+    prediction = detect_poses(model, tensor_image)
 
-# Exibir a imagem
-cv2.imshow('Pose Detection', original_image)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+    # Mover os resultados da GPU para a CPU para processamento posterior
+    prediction = [{k: v.to('cpu') for k, v in t.items()} for t in prediction]
+
+    draw_keypoints(prediction, original_image)
+
+    # Salvar a imagem com as detecções
+    detected_image = f'detected/pose_detected_{n_image}.jpg'
+    save_image(original_image, detected_image)
+
+
+if __name__ == "__main__":
+    n_image = 5
+    main(n_image)
