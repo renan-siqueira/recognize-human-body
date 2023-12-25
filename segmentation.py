@@ -28,20 +28,15 @@ def segment_image(image, model):
     return output_predictions
 
 def draw_segmentation_map(image, segmentation_map, remove_background):
-    # Define a cor da segmentação
     segmentation_color = (0, 255, 0)
 
-    # Cria uma máscara onde os segmentos são localizados
     mask = segmentation_map == 15  # 15 é geralmente a classe 'pessoa' no DeepLabV3
     segmentation_mask = mask.float().mul(255).byte().cpu().numpy()
 
     if remove_background:
-        # Mantém apenas a área segmentada
         segmented_image = cv2.bitwise_and(image, image, mask=segmentation_mask)
     else:
-        # Cria uma imagem colorida baseada na máscara
         segmentation_image = cv2.bitwise_and(image, image, mask=segmentation_mask)
-        # Superpõe a imagem segmentada na original
         segmented_image = cv2.addWeighted(image, 0.5, segmentation_image, 0.5, 0)
 
     return segmented_image
@@ -50,20 +45,16 @@ def main(n_image, remove_background=False):
     segmentation_model = load_segmentation_model()
 
     image_path = f'image{n_image}.jpg'
-    # Carregar a imagem
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    # Segmentar a imagem
     segmentation_map = segment_image(image, segmentation_model)
 
-    # Desenhar o mapa de segmentação
     segmented_image = draw_segmentation_map(image, segmentation_map, remove_background)
 
-    # Salvar ou exibir a imagem resultante
     cv2.imwrite(f'segmented/segmented_image_{n_image}.jpg', cv2.cvtColor(segmented_image, cv2.COLOR_RGB2BGR))
 
 if __name__ == "__main__":
     for n_image in range(1, 6):
         print('Image:', n_image)
-        main(n_image, remove_background=True)  # Altere para False para manter o fundo
+        main(n_image, remove_background=True)
